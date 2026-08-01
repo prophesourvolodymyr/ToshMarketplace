@@ -15,6 +15,14 @@ ToshMarketplace is the shared public web and service platform for Tosh products.
 - Versioned API and SDK client contracts for host apps.
 - Privacy boundary between public metadata, publisher data, and runtime data.
 
+## Repository Migration Boundary
+
+`ToshMarketplace/` is the designated long-term source repository for the marketplace. The working implementation is not moved yet: the current F04-A/F04-B Bun and TypeScript service remains in `../NotchinTosh/marketplace/` while migration is prepared.
+
+The migration must copy the service, tests, migration, package manifest, lockfile, and configuration into this repository without changing behavior. The source copy remains intact until the target repository builds and passes its full deterministic suite. After verification, new marketplace implementation work happens in `ToshMarketplace/`; `NotchinTosh/marketplace/` remains a historical/reference copy until an explicit cleanup decision is documented.
+
+The first implementation slice in this repository is the reference-service migration. It is not the web catalog, Swift client, or host installation work.
+
 ## Architecture
 
 ```text
