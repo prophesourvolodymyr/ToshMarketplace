@@ -17,9 +17,9 @@ ToshMarketplace is the shared public web and service platform for Tosh products.
 
 ## Repository Migration Boundary
 
-`ToshMarketplace/` is the designated long-term source repository for the marketplace. The working implementation is not moved yet: the current F04-A/F04-B Bun and TypeScript service remains in `../NotchinTosh/marketplace/` while migration is prepared.
+`ToshMarketplace/` now owns the verified F04-A/F04-B Bun and TypeScript marketplace service. The service, tests, package boundary, lockfile, configuration, and migration were copied from `../NotchinTosh/marketplace/` and verified independently on 2026-08-01. New marketplace service work belongs here; `NotchinTosh/marketplace/` remains intact as a preserved historical/reference copy.
 
-The migration must copy the service, tests, migration, package manifest, lockfile, and configuration into this repository without changing behavior. The source copy remains intact until the target repository builds and passes its full deterministic suite. After verification, new marketplace implementation work happens in `ToshMarketplace/`; `NotchinTosh/marketplace/` remains a historical/reference copy until an explicit cleanup decision is documented.
+The migration is complete for the deterministic service slice. This repository does not yet own the public web catalog, publisher dashboard, production integrations, Swift clients, or host installation/runtime work.
 
 The first implementation slice in this repository is the reference-service migration. It is not the web catalog, Swift client, or host installation work.
 
@@ -75,11 +75,11 @@ The marketplace is intentionally open to product-specific additions. A host may 
 
 ## Files
 
-- `package.json` — future web/service package boundary.
-- `apps/web/` — future public web and publisher surfaces.
-- `src/` — future API, domain, review, and integration modules.
-- `migrations/` — metadata/state schema migrations.
-- `tests/` — API, privacy, compatibility, publishing, and moderation contracts.
+- `package.json`, `bun.lock`, `tsconfig.json`, `.gitignore` — private Bun/TypeScript service package, locked dependencies, strict compiler settings, and generated-file boundary.
+- `src/` — migrated domain, catalog, storage, validation, publishing, HTTP, PostgreSQL, object-storage, and Tosh account-authorization service modules.
+- `src/marketplace.test.ts` — 14 deterministic marketplace catalog, validation, publishing, review, quarantine, privacy, signing, and rate-limit tests.
+- `src/service-boundaries.test.ts` — 8 deterministic PostgreSQL, object-storage, account-authorization, actor, and HTTP boundary tests.
+- `migrations/001_marketplace_entities.sql` — unchanged JSONB marketplace metadata schema and indexes.
 
 ## Dependencies
 
@@ -87,6 +87,8 @@ The marketplace is intentionally open to product-specific additions. A host may 
 - Root `../ECOSYSTEM.md` and `../DOCKS.md` for shared ownership.
 - `ToshSDK` for package and host compatibility contracts.
 - Each host app for installation, permissions, runtime, and rollback behavior.
+
+The evidence below covers the independent deterministic package and preserved regressions. PostgreSQL, S3/object storage, and Tosh account credentials/deployment remain unverified because the tests use fakes rather than live external services.
 
 ## Verification
 
@@ -100,3 +102,8 @@ The marketplace is intentionally open to product-specific additions. A host may 
 | Privacy | Runtime data and credentials never enter public metadata | Pending implementation |
 | Host failure | Marketplace remains available when a host component crashes | Pending host integration |
 | Product-specific contribution | A host can add a marketplace capability with compatibility and security evidence | Pending implementation |
+| Target migration | The service package and unchanged JSONB migration are independent in `ToshMarketplace/`; no runtime path imports the sibling source repository | Passed 2026-08-01: copied package/config/migration and 12 service source/test files; portable signed-directory validation passed |
+| Target package verification | Frozen install, strict typecheck, focused boundary suite, and full deterministic suite pass | Passed 2026-08-01: `bun install --frozen-lockfile`; `bun run typecheck`; `bun test src/service-boundaries.test.ts` 8/8 with 0 failures; `bun test` 22/22 with 0 failures (14 marketplace + 8 boundary) |
+| Preserved source regression | The NotchinTosh service remains present and behaviorally unchanged | Passed 2026-08-01: `NotchinTosh/marketplace/` `bun run typecheck && bun test` 22/22 with 0 failures; `git diff --exit-code -- marketplace` clean |
+| Swift host regression | Host runtime remains compatible after migration | Passed 2026-08-01: `NotchinTosh/NotchinTosh/` `swift test` 43/43 with 0 failures |
+| Security and file boundary | No source-repository imports, credentials, signing material, runtime data, or generated artifacts enter the target migration | Passed 2026-08-01: target source/config/migration scan found no `../NotchinTosh` or `NotchinTosh/marketplace` path; untracked migration list contains only declared files; `node_modules/`, `.env*`, `dist/`, `build/`, `coverage/`, `*.tgz`, and `*.notchbridge` are ignored |

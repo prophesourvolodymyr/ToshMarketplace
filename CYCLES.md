@@ -2,7 +2,7 @@
 
 **Planned with user:** 2026-08-01
 
-This project owns the marketplace service and future web/API platform. During migration, `../NotchinTosh/marketplace/` is the verified reference copy. New marketplace implementation work moves here only after the migration slice passes.
+This project owns the marketplace service and future web/API platform. The F04-A/F04-B deterministic service migration from `../NotchinTosh/marketplace/` is verified; new marketplace implementation work belongs here, and the sibling copy remains preserved as reference code.
 
 ## Cycle 0 — Repository Foundation
 
@@ -13,12 +13,13 @@ This project owns the marketplace service and future web/API platform. During mi
 
 ## Cycle 1 — Reference Service Migration
 
-- [ ] Copy the verified F04-A/F04-B Bun service into `src/`, `tests/`, `migrations/`, and package configuration
-- [ ] Preserve domain, catalog, validation, publishing, HTTP, PostgreSQL, object-storage, and account-authorization behavior
-- [ ] Run `bun run typecheck` and the full deterministic `bun test` suite in this repository
-- [ ] Confirm no production credentials, tokens, signing keys, or runtime user data are copied
-- [ ] Update migration evidence in `DOCKS.md` and the root F04 documentation
-- [ ] Commit and push the migrated service to `origin/main`
+- [x] F04-A core migration — copy the verified domain, catalog, storage, validation, HTTP, PostgreSQL, object-storage, and account-authorization service into the independent package
+- [x] F04-B publishing migration — copy publishing, review, quarantine, signing, rate-limit, and deterministic lifecycle behavior with both test files
+- [x] Preserve shared behavior — keep public exports, HTTP contracts, validation/signing semantics, immutable storage boundaries, authorization rules, and JSONB migration schema unchanged
+- [x] Target verification — run `bun install --frozen-lockfile`, `bun run typecheck`, focused boundary tests 8/8, and full tests 22/22 with 0 failures
+- [x] Security and file boundary — scan target source/config/migration paths and confirm no sibling imports, credentials, signing material, runtime data, or generated artifacts are tracked
+- [x] Documentation evidence — record target ownership, preserved NotchinTosh reference status, exact Bun/Swift counts, and live-service limitations
+- [x] Commit and push evidence — deliver the migration on `main` through `origin/main` after the documented checks pass
 
 ## Cycle 2 — Marketplace Service Completion
 

@@ -50,7 +50,7 @@ An app may first implement a private product flow, then propose a reusable marke
 
 ## Current State
 
-The repository is initialized and is now the designated destination for the marketplace implementation. The F04-A/F04-B service still lives in `../NotchinTosh/marketplace/`; the next implementation slice migrates that tested reference service here. Until the target repository passes the full suite, the NotchinTosh copy remains the verified source/reference and must not be deleted.
+`ToshMarketplace` now owns the migrated and independently verified F04-A/F04-B marketplace service. New marketplace service changes belong here. `../NotchinTosh/marketplace/` remains intact as the preserved verified reference copy, while NotchinTosh owns its host runtime, Swift client, and installation integration. The target's deterministic tests use fakes; live PostgreSQL, S3/object storage, and Tosh account deployment remain unverified.
 
 ## Related Documents
 
