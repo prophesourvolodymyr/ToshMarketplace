@@ -118,7 +118,9 @@ function summaryFor(contexts: readonly PublicComponentContext[], score: number):
 export class CatalogService {
   public constructor(private readonly store: MarketplaceStore) {}
 
+
   public async search(query: CatalogQuery = {}): Promise<CatalogPage<CatalogProductSummary>> {
+    const selectedHostIDs = query.hostIDs && query.hostIDs.length > 0 ? new Set(query.hostIDs) : query.hostID ? new Set([query.hostID]) : undefined;
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 24));
     const publishers = await this.store.listPublishers();
@@ -135,7 +137,7 @@ export class CatalogService {
     }
     const contextsByProduct = new Map<ID, PublicComponentContext[]>();
     for (const component of components) {
-      if (query.hostID && component.hostID !== query.hostID) continue;
+      if (selectedHostIDs && !selectedHostIDs.has(component.hostID)) continue;
       const product = products.find((candidate) => candidate.id === component.productID);
       if (query.publisherID && (!product || product.publisherID !== query.publisherID)) continue;
       const publisher = product ? publisherByID.get(product.publisherID) : undefined;

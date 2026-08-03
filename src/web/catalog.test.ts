@@ -18,7 +18,7 @@ import {
 } from "./catalog";
 import { createMarketplaceWebHandler, type MarketplaceWebAssets } from "./server";
 
-const catalogState: CatalogURLState = { text: "focus mode", hostID: "notchintosh", page: 2, pageSize: 48 };
+const catalogState: CatalogURLState = { text: "focus mode", hostIDs: ["notchintosh"], page: 2, pageSize: 48 };
 
 function jsonResponse(value: unknown, status = 200): Response {
   return Response.json(value, { status });
@@ -38,20 +38,26 @@ describe("F04-C browser route contracts", () => {
     expect(parseRoute(new URL("https://marketplace.test/")).kind).toBe("catalog");
     expect(parseRoute(new URL("https://marketplace.test/catalog?q=focus%20mode&hostID=notchintosh&page=0&pageSize=999"))).toEqual({
       kind: "catalog",
-      state: { text: "focus mode", hostID: "notchintosh", page: 1, pageSize: 100 },
+      state: { text: "focus mode", hostIDs: ["notchintosh"], page: 1, pageSize: 100 },
     });
-    expect(parseRoute(new URL("https://marketplace.test/products/product.focus-field-guide?hostID=notchintosh&q=focus%20mode"))).toEqual({
+    expect(parseRoute(new URL("https://marketplace.test/catalog?hostID=notchintosh&hostID=launchintosh&hostID=notchintosh"))).toEqual({
+      kind: "catalog",
+      state: { text: "", hostIDs: ["notchintosh", "launchintosh"], page: 1, pageSize: 24 },
+    });
+    expect(parseRoute(new URL("https://marketplace.test/products/product.focus-field-guide?hostID=notchintosh&hostID=launchintosh&q=focus%20mode"))).toEqual({
       kind: "product",
       productID: "product.focus-field-guide",
-      hostID: "notchintosh",
+      hostID: undefined,
+      returnHostIDs: ["notchintosh", "launchintosh"],
       returnText: "focus mode",
     });
-    expect(parseRoute(new URL("https://marketplace.test/products/product%2Fwith-slash"))).toEqual({ kind: "product", productID: "product/with-slash", returnText: "" });
+    expect(parseRoute(new URL("https://marketplace.test/products/product%2Fwith-slash"))).toEqual({ kind: "product", productID: "product/with-slash", hostID: undefined, returnHostIDs: [], returnText: "" });
     expect(parseRoute(new URL("https://marketplace.test/publishers/private"))).toEqual({ kind: "not-found" });
     expect(parseRoute(new URL("https://marketplace.test/products/%E0%A4%A"))).toEqual({ kind: "not-found" });
     expect(catalogURL(catalogState)).toBe("/catalog?q=focus+mode&hostID=notchintosh&page=2&pageSize=48");
-    expect(productURL("product.focus-field-guide", "notchintosh", "focus mode")).toBe("/products/product.focus-field-guide?hostID=notchintosh&q=focus+mode");
-    expect(catalogURL({ text: "", page: 1, pageSize: 24 })).toBe("/catalog");
+    expect(catalogURL({ text: "", hostIDs: ["notchintosh", "launchintosh"], page: 1, pageSize: 24 })).toBe("/catalog?hostID=notchintosh&hostID=launchintosh");
+    expect(productURL("product.focus-field-guide", "notchintosh", "focus mode", ["notchintosh", "launchintosh"])).toBe("/products/product.focus-field-guide?hostID=notchintosh&hostID=launchintosh&q=focus+mode");
+    expect(catalogURL({ text: "", hostIDs: [], page: 1, pageSize: 24 })).toBe("/catalog");
   });
 });
 
@@ -67,12 +73,12 @@ describe("F04-C browser API client", () => {
       return new Response("missing", { status: 404 });
     };
     const api = new MarketplaceAPI(fetcher);
-    const page = await api.search({ text: "focus", hostID: "notchintosh", page: 1, pageSize: 24 });
+    const page = await api.search({ text: "focus", hostIDs: ["notchintosh", "launchintosh"], page: 1, pageSize: 24 });
     await api.listHosts();
     await api.getProduct("product.focus-field-guide");
     await api.getProduct("product.focus-field-guide", "notchintosh");
     expect(requests).toEqual([
-      "/v1/catalog/products?q=focus&hostID=notchintosh&page=1&pageSize=24",
+      "/v1/catalog/products?q=focus&page=1&pageSize=24&hostID=notchintosh&hostID=launchintosh",
       "/v1/hosts",
       "/v1/products/product.focus-field-guide",
       "/v1/products/product.focus-field-guide?hostID=notchintosh",
@@ -84,9 +90,9 @@ describe("F04-C browser API client", () => {
     const apiError = new MarketplaceAPI(async () => new Response(JSON.stringify({ error: { message: "private signing detail" } }), { status: 500 }));
     await expect(apiError.listHosts()).rejects.toEqual(expect.objectContaining({ endpoint: "hosts", status: 500, message: "Host compatibility information is temporarily unavailable." }));
     const offlineError = new MarketplaceAPI(async () => { throw new Error("private socket detail"); });
-    await expect(offlineError.search({ text: "", page: 1, pageSize: 24 })).rejects.toBeInstanceOf(MarketplaceAPIError);
+    await expect(offlineError.search({ text: "", hostIDs: [], page: 1, pageSize: 24 })).rejects.toBeInstanceOf(MarketplaceAPIError);
     try {
-      await offlineError.search({ text: "", page: 1, pageSize: 24 });
+      await offlineError.search({ text: "", hostIDs: [], page: 1, pageSize: 24 });
     } catch (error) {
       expect(error).toEqual(expect.objectContaining({ endpoint: "catalog", status: undefined }));
       expect(String(error)).not.toContain("private socket detail");
@@ -99,8 +105,8 @@ describe("F04-C public view model and safe rendering boundary", () => {
     const { hosts, page, detail } = await fixtureData();
     const catalogModel = toCatalogViewModel(page, hosts);
     const productModel = toProductViewModel(detail, hosts);
-    const catalogMarkup = renderCatalogState({ kind: "ready", route: { text: "", page: 1, pageSize: 24 }, model: catalogModel });
-    const productMarkup = renderProductState({ kind: "ready", route: { kind: "product", productID: detail.productID, returnText: "", }, model: productModel });
+    const catalogMarkup = renderCatalogState({ kind: "ready", route: { text: "", hostIDs: [], page: 1, pageSize: 24 }, model: catalogModel });
+    const productMarkup = renderProductState({ kind: "ready", route: { kind: "product", productID: detail.productID, returnHostIDs: [], returnText: "" }, model: productModel });
     const serialized = JSON.stringify({ catalogModel, productModel, catalogMarkup, productMarkup });
     const viewModelSerialized = JSON.stringify({ catalogModel, productModel });
     expect(serialized).toContain("Focus Field Guide");
@@ -108,6 +114,9 @@ describe("F04-C public view model and safe rendering boundary", () => {
     expect(serialized).toContain("focus");
     expect(serialized).toContain("Next up");
     expect(serialized).toContain("NotchinTosh");
+    expect(catalogMarkup).not.toContain("host-picker__copy");
+    expect(catalogMarkup).toContain('aria-label="Select NotchinTosh"');
+    expect(catalogMarkup).toContain('aria-label="Select LaunchinTosh"');
     expect(serialized).toContain("1.2.0");
     expect(catalogMarkup).toContain("host-picker");
     expect(catalogMarkup).toContain('data-host-filter="notchintosh"');
@@ -145,7 +154,7 @@ describe("F04-C public view model and safe rendering boundary", () => {
   test("escapes untrusted public text before it enters markup", async () => {
     const { hosts, page } = await fixtureData();
     const unsafePage = { ...page, items: page.items.map((item) => ({ ...item, name: "<script>alert(1)</script>", shortDescription: "\"quoted\" & unsafe" })) };
-    const markup = renderCatalogState({ kind: "ready", route: { text: "", page: 1, pageSize: 24 }, model: toCatalogViewModel(unsafePage, hosts) });
+    const markup = renderCatalogState({ kind: "ready", route: { text: "", hostIDs: [], page: 1, pageSize: 24 }, model: toCatalogViewModel(unsafePage, hosts) });
     expect(markup).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(markup).toContain("&quot;quoted&quot; &amp; unsafe");
     expect(markup).not.toContain("<script>alert(1)</script>");
@@ -180,7 +189,7 @@ describe("F04-C serializable UI states", () => {
     const incompatible = await fixture.catalog.getProduct("product.weather-window", "notchintosh");
     if (!incompatible) throw new Error("Fixture incompatible product was not seeded.");
     const model = toProductViewModel(incompatible, hosts, "notchintosh");
-    const route = { kind: "product" as const, productID: incompatible.productID, hostID: "notchintosh", returnText: "weather" };
+    const route = { kind: "product" as const, productID: incompatible.productID, hostID: "notchintosh", returnHostIDs: ["notchintosh"], returnText: "weather" };
     const ready = renderProductState({ kind: "ready", route, model });
     const notFound = renderProductState({ kind: "not-found", route });
     const apiError = renderProductState({ kind: "api-error", route, endpoint: "product", message: "This product could not be loaded right now." });

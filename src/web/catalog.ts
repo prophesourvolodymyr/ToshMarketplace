@@ -12,14 +12,14 @@ import type {
 
 export type CatalogURLState = {
   text: string;
-  hostID?: string;
+  hostIDs: readonly string[];
   page: number;
   pageSize: number;
 };
 
 export type WebRoute =
   | { kind: "catalog"; state: CatalogURLState }
-  | { kind: "product"; productID: string; hostID?: string; returnText: string }
+  | { kind: "product"; productID: string; hostID?: string; returnHostIDs: readonly string[]; returnText: string }
   | { kind: "not-found" };
 
 export const DEFAULT_PAGE = 1;
@@ -41,9 +41,8 @@ function queryNumber(url: URL, key: string, fallback: number, maximum?: number):
   return clampInteger(value, 1, maximum, fallback);
 }
 
-function optionalQueryValue(url: URL, key: string): string | undefined {
-  const value = url.searchParams.get(key);
-  return value && value.trim() ? value : undefined;
+function queryValues(url: URL, key: string): readonly string[] {
+  return [...new Set(url.searchParams.getAll(key).map((value) => value.trim()).filter(Boolean))];
 }
 
 function decodePathSegment(value: string): string | undefined {
@@ -62,7 +61,7 @@ export function parseRoute(url: URL): WebRoute {
       kind: "catalog",
       state: {
         text: url.searchParams.get("q") ?? "",
-        hostID: optionalQueryValue(url, "hostID"),
+        hostIDs: queryValues(url, "hostID"),
         page: queryNumber(url, "page", DEFAULT_PAGE),
         pageSize: queryNumber(url, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
       },
@@ -73,10 +72,12 @@ export function parseRoute(url: URL): WebRoute {
   if (!encodedProductID || encodedProductID.includes("/")) return { kind: "not-found" };
   const productID = decodePathSegment(encodedProductID);
   if (!productID) return { kind: "not-found" };
+  const hostIDs = queryValues(url, "hostID");
   return {
     kind: "product",
     productID,
-    hostID: optionalQueryValue(url, "hostID"),
+    hostID: hostIDs.length === 1 ? hostIDs[0] : undefined,
+    returnHostIDs: hostIDs,
     returnText: url.searchParams.get("q") ?? "",
   };
 }
@@ -84,7 +85,9 @@ export function parseRoute(url: URL): WebRoute {
 export function catalogURL(state: CatalogURLState): string {
   const params = new URLSearchParams();
   if (state.text) params.set("q", state.text);
-  if (state.hostID) params.set("hostID", state.hostID);
+  for (const hostID of state.hostIDs) {
+    if (hostID) params.append("hostID", hostID);
+  }
   const page = clampInteger(state.page, 1, undefined, DEFAULT_PAGE);
   const pageSize = clampInteger(state.pageSize, 1, MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE);
   if (page !== DEFAULT_PAGE) params.set("page", String(page));
@@ -93,9 +96,11 @@ export function catalogURL(state: CatalogURLState): string {
   return `/catalog${query ? `?${query}` : ""}`;
 }
 
-export function productURL(productID: string, hostID: string | undefined, returnText: string): string {
+export function productURL(productID: string, hostID: string | undefined, returnText: string, returnHostIDs: readonly string[] = hostID ? [hostID] : []): string {
   const params = new URLSearchParams();
-  if (hostID) params.set("hostID", hostID);
+  for (const selectedHostID of returnHostIDs) {
+    if (selectedHostID) params.append("hostID", selectedHostID);
+  }
   if (returnText) params.set("q", returnText);
   const query = params.toString();
   return `/products/${encodeURIComponent(productID)}${query ? `?${query}` : ""}`;
@@ -177,10 +182,12 @@ export class MarketplaceAPI implements MarketplaceAPIClient {
   public search(state: CatalogURLState): Promise<CatalogPage<CatalogProductSummary>> {
     const params = new URLSearchParams({
       q: state.text,
-      hostID: state.hostID ?? "",
       page: String(clampInteger(state.page, 1, undefined, DEFAULT_PAGE)),
       pageSize: String(clampInteger(state.pageSize, 1, MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE)),
     });
+    for (const hostID of state.hostIDs) {
+      if (hostID) params.append("hostID", hostID);
+    }
     return this.request("catalog", `/v1/catalog/products?${params.toString()}`, parseCatalogPage);
   }
 
@@ -521,12 +528,13 @@ function renderAppLogo(value: string, size: "small" | "large" = "large"): string
   return `<span class="app-logo app-logo--${size}" aria-hidden="true">${escapeHTML(glyph)}</span>`;
 }
 
-function renderHostPicker(hosts: readonly HostViewModel[], selectedHostID: string | undefined, disabled: boolean): string {
-  const options = [{ id: "", displayName: "All apps", icon: "all" }, ...hosts];
-  return `<div class="host-picker" role="group" aria-label="Choose a host app">${options.map((host) => {
-    const selected = host.id ? selectedHostID === host.id : !selectedHostID;
+function renderHostPicker(hosts: readonly HostViewModel[], selectedHostIDs: readonly string[], disabled: boolean): string {
+  const options: readonly Pick<HostViewModel, "id" | "displayName" | "icon">[] = [{ id: "", displayName: "All apps", icon: "◎" }, ...hosts];
+  return `<div class="host-picker" role="group" aria-label="Choose marketplace apps">${options.map((host) => {
+    const selected = host.id ? selectedHostIDs.includes(host.id) : selectedHostIDs.length === 0;
     const filter = host.id || "all";
-    return `<button class="host-picker__option${selected ? " host-picker__option--selected" : ""}" type="button" data-host-filter="${escapeHTML(filter)}" aria-pressed="${selected}"${disabled ? " disabled" : ""}><span class="host-picker__logo">${renderAppLogo(host.icon, "small")}</span><span class="host-picker__copy"><strong>${escapeHTML(host.displayName)}</strong><span>${selected ? "Selected" : "View products"}</span></span></button>`;
+    const accessibleName = host.id ? `Select ${host.displayName}` : "Show products for all apps";
+    return `<button class="host-picker__option${selected ? " host-picker__option--selected" : ""}" type="button" data-host-filter="${escapeHTML(filter)}" aria-label="${escapeHTML(accessibleName)}" aria-pressed="${selected}"${disabled ? " disabled" : ""}><span class="host-picker__logo">${renderAppLogo(host.icon, "small")}</span></button>`;
   }).join("")}</div>`;
 }
 
@@ -535,8 +543,7 @@ function renderHeader(): string {
 }
 
 function renderCatalogControls(route: CatalogURLState, model: CatalogViewModel): string {
-  const hostHelp = model.hostDataAvailable ? "Choose a host app to filter its products." : "Host app choices are temporarily unavailable.";
-  return `<section class="catalog-controls" aria-labelledby="catalog-controls-title"><div class="section-kicker">Discovery</div><h2 id="catalog-controls-title">Find a product for your setup</h2><form id="catalog-search" class="search-form"><div class="search-form__field search-form__field--query"><label for="catalog-query">Search products, widgets, or publishers</label><input id="catalog-query" name="q" type="search" value="${escapeHTML(route.text)}" autocomplete="off" placeholder="Try focus, weather, or a publisher" /></div><div class="search-form__field search-form__field--hosts"><span class="field-label" id="host-filter-label">Hosts</span>${renderHostPicker(model.hosts, route.hostID, !model.hostDataAvailable || model.hosts.length === 0)}<p id="host-filter-help" class="field-help">${escapeHTML(hostHelp)}</p></div><div class="search-form__actions"><button class="button button--primary" type="submit">Search</button><button class="button button--quiet" type="button" data-action="reset">Reset</button></div></form></section>`;
+  return `<section class="catalog-controls" aria-labelledby="catalog-controls-title"><div class="section-kicker">Discovery</div><h2 id="catalog-controls-title">Find a product for your setup</h2><form id="catalog-search" class="search-form"><div class="search-form__field search-form__field--query"><label for="catalog-query">Search products, widgets, or publishers</label><input id="catalog-query" name="q" type="search" value="${escapeHTML(route.text)}" autocomplete="off" placeholder="Try focus, weather, or a publisher" /></div><div class="search-form__field search-form__field--hosts">${renderHostPicker(model.hosts, route.hostIDs, !model.hostDataAvailable || model.hosts.length === 0)}</div><div class="search-form__actions"><button class="button button--primary" type="submit">Search</button><button class="button button--quiet" type="button" data-action="reset">Reset</button></div></form></section>`;
 }
 
 function renderCardPreviewGrid(item: CatalogCardViewModel): string {
@@ -550,20 +557,24 @@ function renderCardVersion(item: CatalogCardViewModel): string {
   return `<span class="card-meta__version">${escapeHTML(label)}</span>`;
 }
 
-function renderCardCompatibility(item: CatalogCardViewModel, route: CatalogURLState, hosts: readonly HostViewModel[], hostDataAvailable: boolean): string {
+function renderCardCompatibility(item: CatalogCardViewModel, route: CatalogURLState, hostDataAvailable: boolean): string {
   if (!hostDataAvailable) return `<span class="card-meta card-meta--warning"><span class="status-dot status-dot--warning" aria-hidden="true"></span>Compatibility pending</span>`;
-  if (route.hostID) {
-    const selectedHost = hostLabel(hosts, route.hostID);
-    const compatible = item.compatibleHostIDs.includes(route.hostID);
-    return `<span class="card-meta card-meta--${compatible ? "success" : "warning"}"><span class="status-dot status-dot--${compatible ? "success" : "warning"}" aria-hidden="true"></span>${escapeHTML(compatible ? `For ${selectedHost}` : `Not available for ${selectedHost}`)}</span>`;
+  if (route.hostIDs.length > 0) {
+    const compatibleCount = route.hostIDs.filter((hostID) => item.compatibleHostIDs.includes(hostID)).length;
+    const selectedCount = route.hostIDs.length;
+    const allCompatible = compatibleCount === selectedCount;
+    const text = allCompatible ? "Compatible with selection" : compatibleCount > 0 ? `${compatibleCount} of ${selectedCount} selected hosts` : "Not available for selection";
+    const status = allCompatible ? "success" : "warning";
+    return `<span class="card-meta card-meta--${status}"><span class="status-dot status-dot--${status}" aria-hidden="true"></span>${escapeHTML(text)}</span>`;
   }
   const hostCount = item.compatibleHostIDs.length;
   return `<span class="card-meta card-meta--${hostCount > 0 ? "success" : "warning"}"><span class="status-dot status-dot--${hostCount > 0 ? "success" : "warning"}" aria-hidden="true"></span>${escapeHTML(hostCount > 0 ? `${hostCount} compatible host${hostCount === 1 ? "" : "s"}` : "Compatibility pending")}</span>`;
 }
 
-function renderProductCard(item: CatalogCardViewModel, route: CatalogURLState, hosts: readonly HostViewModel[], index: number, hostDataAvailable: boolean): string {
+function renderProductCard(item: CatalogCardViewModel, route: CatalogURLState, index: number, hostDataAvailable: boolean): string {
   const handoffID = `get-note-${item.productID.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
-  return `<article class="product-card${index === 0 ? " product-card--featured" : ""}"><div class="product-card__body"><div class="product-card__top">${renderAppLogo(item.icon)}<div class="product-card__identity"><div class="product-card__eyebrow">${escapeHTML(item.publisherName)}</div><h3>${escapeHTML(item.name)}</h3><p class="product-card__description">${escapeHTML(item.shortDescription)}</p><div class="product-card__actions"><a class="card-action card-action--primary" href="${escapeHTML(productURL(item.productID, route.hostID, route.text))}" data-app-route>Check out</a><button class="card-action card-action--secondary" type="button" disabled aria-describedby="${escapeHTML(handoffID)}">Get</button></div><p class="card-handoff-note" id="${escapeHTML(handoffID)}">Host-app handoff is not available yet.</p></div></div>${renderCardPreviewGrid(item)}<footer class="product-card__footer"><span class="card-meta">${escapeHTML(String(item.widgetCount))} widget${item.widgetCount === 1 ? "" : "s"}</span>${renderCardCompatibility(item, route, hosts, hostDataAvailable)}${renderCardVersion(item)}</footer></div></article>`;
+  const detailHostID = route.hostIDs.length === 1 ? route.hostIDs[0] : undefined;
+  return `<article class="product-card${index === 0 ? " product-card--featured" : ""}"><div class="product-card__body"><div class="product-card__top">${renderAppLogo(item.icon)}<div class="product-card__identity"><div class="product-card__eyebrow">${escapeHTML(item.publisherName)}</div><h3>${escapeHTML(item.name)}</h3><p class="product-card__description">${escapeHTML(item.shortDescription)}</p><div class="product-card__actions"><a class="card-action card-action--primary" href="${escapeHTML(productURL(item.productID, detailHostID, route.text, route.hostIDs))}" data-app-route>Check out</a><button class="card-action card-action--secondary" type="button" disabled aria-describedby="${escapeHTML(handoffID)}">Get</button></div><p class="card-handoff-note" id="${escapeHTML(handoffID)}">Host-app handoff is not available yet.</p></div></div>${renderCardPreviewGrid(item)}<footer class="product-card__footer"><span class="card-meta">${escapeHTML(String(item.widgetCount))} widget${item.widgetCount === 1 ? "" : "s"}</span>${renderCardCompatibility(item, route, hostDataAvailable)}${renderCardVersion(item)}</footer></div></article>`;
 }
 
 function renderCatalogResults(route: CatalogURLState, model: CatalogViewModel): string {
@@ -572,7 +583,7 @@ function renderCatalogResults(route: CatalogURLState, model: CatalogViewModel): 
   }
   const first = model.items[0];
   const featured = first ? `<section class="featured-band" aria-labelledby="featured-title"><div><div class="section-kicker">Featured in this search</div><h2 id="featured-title">${escapeHTML(first.name)}</h2><p>${escapeHTML(first.shortDescription)}</p></div><div class="featured-band__meta"><span>${escapeHTML(first.publisherName)}</span><span>${escapeHTML(String(first.widgetCount))} widgets</span><span>${escapeHTML(model.hostDataAvailable && first.compatibleHostIDs.length > 0 ? `${first.compatibleHostIDs.length} host${first.compatibleHostIDs.length === 1 ? "" : "s"}` : "Host data unavailable")}</span></div></section>` : "";
-  return `${featured}<section class="results-section" aria-labelledby="results-title"><div class="results-heading"><div><div class="section-kicker">Public catalog</div><h2 id="results-title">${escapeHTML(String(model.total))} product${model.total === 1 ? "" : "s"}</h2></div><p aria-live="polite">Showing page ${escapeHTML(String(model.page))}</p></div><div class="product-grid">${model.items.map((item, index) => renderProductCard(item, route, model.hosts, index, model.hostDataAvailable)).join("")}</div></section>`;
+  return `${featured}<section class="results-section" aria-labelledby="results-title"><div class="results-heading"><div><div class="section-kicker">Public catalog</div><h2 id="results-title">${escapeHTML(String(model.total))} product${model.total === 1 ? "" : "s"}</h2></div><p aria-live="polite">Showing page ${escapeHTML(String(model.page))}</p></div><div class="product-grid">${model.items.map((item, index) => renderProductCard(item, route, index, model.hostDataAvailable)).join("")}</div></section>`;
 }
 
 function renderCatalogError(state: Extract<CatalogViewState, { kind: "api-error" | "offline" }>): string {
@@ -650,7 +661,7 @@ function renderProductError(state: Extract<ProductViewState, { kind: "api-error"
 }
 
 export function renderProductState(state: ProductViewState): string {
-  const backURL = catalogURL({ text: state.route.returnText, hostID: state.route.hostID, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE });
+  const backURL = catalogURL({ text: state.route.returnText, hostIDs: state.route.returnHostIDs, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE });
   if (state.kind === "loading") {
     return `${renderHeader()}<main class="product-page" data-state="loading"><div class="page-width"><a class="back-link" href="${escapeHTML(backURL)}" data-app-route>← Back to catalog</a><div class="detail-skeleton" aria-busy="true" aria-label="Loading product"><div class="skeleton-detail-preview"></div><div class="skeleton-detail-copy"></div></div></div></main>`;
   }
@@ -770,7 +781,13 @@ export function mountMarketplaceApp(root: HTMLElement, options: MarketplaceAppOp
       event.preventDefault();
       const route = parseRoute(new URL(browserWindow.location.href));
       if (route.kind !== "catalog") return;
-      navigate(catalogURL({ text: route.state.text, hostID: hostFilter === "all" ? undefined : hostFilter, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
+      const selectedHostIDs = route.state.hostIDs;
+      const nextHostIDs = hostFilter === "all"
+        ? []
+        : selectedHostIDs.includes(hostFilter)
+          ? selectedHostIDs.filter((hostID) => hostID !== hostFilter)
+          : [...selectedHostIDs, hostFilter];
+      navigate(catalogURL({ text: route.state.text, hostIDs: nextHostIDs, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
       return;
     }
     const action = target.closest<HTMLElement>("[data-action]")?.dataset.action;
@@ -781,7 +798,7 @@ export function mountMarketplaceApp(root: HTMLElement, options: MarketplaceAppOp
     }
     if (action === "reset") {
       event.preventDefault();
-      navigate(catalogURL({ text: "", page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
+      navigate(catalogURL({ text: "", hostIDs: [], page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
       return;
     }
     const link = target.closest<HTMLAnchorElement>("a[data-app-route]");
@@ -798,8 +815,8 @@ export function mountMarketplaceApp(root: HTMLElement, options: MarketplaceAppOp
     event.preventDefault();
     const query = form.querySelector<HTMLInputElement>("#catalog-query")?.value ?? "";
     const route = parseRoute(new URL(browserWindow.location.href));
-    const hostID = route.kind === "catalog" ? route.state.hostID : undefined;
-    navigate(catalogURL({ text: query, hostID, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
+    const hostIDs = route.kind === "catalog" ? route.state.hostIDs : [];
+    navigate(catalogURL({ text: query, hostIDs, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
   };
 
   const onPopState = (): void => {

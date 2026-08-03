@@ -49,11 +49,11 @@ The independent Bun/TypeScript service owns domain models, public catalog filter
 
 ### F04-C — Public Web Catalog
 
-F04-C adds the framework-free browser module, typed route/API/view-model boundary, accessible editorial catalog/detail surface, same-origin shell handler, deterministic fake fixture, and browser/contract evidence described in the child document.
+F04-C adds the framework-free browser module, typed route/API/view-model boundary, accessible editorial catalog/detail surface with a visible-name-free logo-only multi-host selector, same-origin shell handler, deterministic fake fixture, and browser/contract evidence described in the child document.
 
 ## Remaining F04 Areas
 
-Publisher dashboard, account flows, production PostgreSQL/S3/Tosh-account deployment, signed host installation handoff, package download/verification UX, Swift marketplace clients, host runtime integration, and operational evidence remain pending and must not be marked complete by F04-C. The pending Swift client must reuse the approved marketplace direction: black-and-white surfaces with a warm accent, selectable host-app logo tiles, and concise product cards with the logo leading the identity.
+Publisher dashboard, account flows, production PostgreSQL/S3/Tosh-account deployment, signed host installation handoff, package download/verification UX, Swift marketplace clients, host runtime integration, and operational evidence remain pending and must not be marked complete by F04-C. The pending Swift client must reuse the approved marketplace direction: black-and-white surfaces with a warm accent, logo-only selectable host-app tiles with accessible names, and concise product cards with the logo leading the identity.
 
 ## States
 
@@ -79,7 +79,7 @@ The F04-C child must be verified against the existing service tests before broad
 | Scenario | Expected result | Evidence |
 |---|---|---|
 | Existing service contracts | Existing public/private routes and privacy assertions remain unchanged | Passed 2026-08-03: `bun test` 32/32 with 0 failures, including original 22 service tests and additive capabilities assertion |
-| Anonymous web catalog | Browser reaches catalog without login and displays only safe public metadata | Passed 2026-08-03: Chrome 150.0.0.0 at 1440x1000 and fake fixture browse/search/host/reset/retry flows |
+| Anonymous web catalog | Browser reaches catalog without login, displays only safe public metadata, and supports logo-only single/multi-host selection | Passed 2026-08-03: Chrome 150.0.0.0 at 1440x1000 and 390x844; fake fixture browse/search/single-host/multi-host/reset/retry flows passed, with no visible host-name copy in the selector |
 | Product detail and compatibility | Detail shows public product data; incompatible selected host has no install/deep-link CTA | Passed 2026-08-03: focus detail refresh and Weather Window + NotchinTosh incompatible state verified; alternative LaunchinTosh context only |
 | Publisher/privacy boundary | Browser contains no private publisher, artifact, signing, review, package-path, or runtime values | Passed 2026-08-03: view-model/render tests and DOM scans found no forbidden values or unsafe preview/image URL |
 | Responsive/reduced motion | Desktop and narrow catalog/detail remain usable; reduced motion preserves content and removes nonessential motion | Passed 2026-08-03: Chrome 390x844 no horizontal overflow with stacked detail; reduced-motion loading-to-ready and route navigation remained usable |

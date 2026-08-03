@@ -239,6 +239,7 @@ export interface AuditEvent {
 export interface CatalogQuery {
   text?: string;
   hostID?: ID;
+  hostIDs?: readonly ID[];
   publisherID?: ID;
   page?: number;
   pageSize?: number;

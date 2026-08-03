@@ -31,7 +31,7 @@ This project owns the marketplace service and future web/API platform. The F04-A
 ## Cycle 3 — Public Web Marketplace
 
 - [x] Build anonymous public catalog and static product/widget pages
-- [x] Refine public catalog with host-app logo filters, monochrome styling, and concise App Store-like cards
+- [x] Refine public catalog with logo-only multi-host filters, monochrome styling, and concise App Store-like cards
 - [ ] Add host compatibility filtering and deep-link installation handoff
 - [ ] Add authenticated publisher dashboard
 - [ ] Verify public/private metadata and privacy boundaries

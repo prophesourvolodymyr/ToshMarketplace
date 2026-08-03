@@ -6,13 +6,13 @@ F04-C is the anonymous, same-origin Tosh Marketplace catalog and public product/
 
 - A framework-free browser module bundled by Bun from `src/web/catalog.ts`.
 - Catalog routes at `/` and `/catalog`, and product routes at `/products/:id`; other browser paths return a safe 404.
-- Typed route state preserving search text, selected host, page, page size, and detail return context.
+- Typed route state preserving search text, selected host apps, page, page size, and detail return context.
 - API calls to the existing public `/v1` contracts only:
   - `GET /v1/catalog/products?q=&hostID=&page=&pageSize=`
   - `GET /v1/hosts`
   - `GET /v1/products/:id` or `GET /v1/products/:id?hostID=`
 - Safe public catalog cards and product detail view models that discard private and artifact metadata.
-- Host app logo picker using public host icon placeholders instead of a host dropdown; one selected host app is reflected in the URL and results.
+- Host app logo picker using public host icon placeholders instead of a host dropdown; the all-apps state or one or more selected host apps are reflected in the URL and results.
 - App Store-like product cards with a product logo at the left, concise identity and actions at the right, four safe preview placeholders, and a compact footer.
 - Explicit loading, ready, empty, no-hosts, unavailable/not-found, API-error, and offline states with retry/reset actions.
 - Accessible semantic markup, visible focus, keyboard navigation, stable loading skeletons, reduced-motion support, and responsive desktop/narrow layouts.
@@ -52,12 +52,12 @@ The browser owns presentation state only. It does not filter catalog results, se
 
 | Route | Meaning | State behavior |
 |---|---|---|
-| `/` | Catalog entry point | Equivalent to `/catalog`; preserves `q`, `hostID`, `page`, and `pageSize` |
+| `/` | Catalog entry point | Equivalent to `/catalog`; preserves `q`, repeated `hostID`, `page`, and `pageSize` |
 | `/catalog` | Catalog page | Search and host controls update this URL; reset returns to safe defaults |
-| `/products/:id` | Product detail | Carries optional `hostID`; `returnText` preserves the catalog search text for the back link |
+| `/products/:id` | Product detail | Carries zero or more return `hostID` values; a single selected host scopes the detail request, while multiple selections return to the full selection |
 | Other path | Not found | Browser app shows a readable safe 404 only when served by the handler |
 
-`parseRoute()` clamps invalid page/pageSize values to the service defaults (page 1, page size 24, maximum page size 100). Product links carry the selected host and current search text. The detail back link restores the catalog URL and context.
+`parseRoute()` clamps invalid page/pageSize values to the service defaults (page 1, page size 24, maximum page size 100), deduplicates repeated host IDs while preserving their first-seen order, and records a single host as the detail request scope. Product links carry the selected host set and current search text. The detail back link restores the catalog URL and context.
 
 ## Public API and View-Model Boundary
 
@@ -76,7 +76,7 @@ External links are allowed only for source, license, support, privacy, and host 
 The visual direction is a black-and-white App Store-like catalog with one warm accent for action and selection. It is calm and editorial without presenting internal marketplace implementation details.
 
 - A black masthead rail contains the Tosh Marketplace wordmark and a compact public-metadata context line.
-- The discovery controls use a text search plus a horizontal host-app logo rail. Every active host is a selectable logo tile with a placeholder mark, display name, selected state, and keyboard-operable button behavior. `All apps` is the default tile. There is no host dropdown.
+- The discovery controls use a text search plus a horizontal host-app logo rail. Every active host is a selectable logo-only tile with a placeholder mark, accessible name, selected state, and keyboard-operable button behavior. The all-apps tile is the default; selecting additional tiles adds them to the filter, selecting an active tile again removes it, and selecting all apps clears the set. Host names are not rendered as visible picker copy. There is no host dropdown.
 - The catalog keeps an asymmetric featured-result band, then an intrinsic responsive product grid.
 - Each product card is a consistent vertical composition. The product placeholder logo sits on the left of the identity row; the publisher and title sit on the right; `Check out` and a truthful disabled `Get` button sit directly below the title; four equal safe preview tiles sit below the actions; the footer contains only widget count, compatibility summary, and a single latest-version summary.
 - Cards never show component IDs, bridge IDs, package formats, per-host version rows, signing data, artifact paths, or runtime details. The public card is a product discovery surface, not an implementation inspector.
@@ -103,7 +103,7 @@ Every status/error announcement uses an `aria-live` region. Error details are sa
 
 ## Accessibility and Motion
 
-- Use `header`, `nav` where navigation is present, `main`, `form`, visible `label`/field label, host-picker `button` group, `section`, `article`, `a`, headings, and lists.
+- Use `header`, `nav` where navigation is present, `main`, `form`, a visible label for the text field, an accessible host-picker `button` group, `section`, `article`, `a`, headings, and lists.
 - Text and attributes are built with `textContent`/DOM APIs or escaped by a proven `escapeHTML()` invariant. Static class/id names are the only unescaped markup.
 - Controls are keyboard operable with logical tab order, Enter/Space activation, visible high-contrast focus, and Escape dismissal for transient filter UI if introduced.
 - Search → host logo filter → product link traversal must be usable without a pointer.
@@ -144,15 +144,16 @@ Every status/error announcement uses an `aria-live` region. Error details are sa
 | Test scenario | Expected result | Evidence |
 |---|---|---|
 | Frozen install and typecheck | Dependency-free web scripts install with lockfile unchanged; strict TypeScript passes | Passed 2026-08-03: `bun install --frozen-lockfile` reported no changes; `bun run typecheck` exited 0 on Bun 1.3.11 |
-| Route parsing/URL generation | Catalog/product/invalid paths, host/search/page state, and detail return context are deterministic | Passed 2026-08-03: focused suite 10/10; root, `/catalog`, clamped page/pageSize, selected-host product, encoded product ID, invalid route, and reset URLs asserted |
-| API requests | Exact catalog/host/detail URLs; existing `v1` envelope fields remain intact | Passed 2026-08-03: focused suite 10/10; exact four request paths and `apiVersion`, `items`, `page`, `pageSize`, `total` asserted |
+| Route parsing/URL generation | Catalog/product/invalid paths, repeated selected hosts, search/page state, and detail return context are deterministic | Passed 2026-08-03: focused suite 10/10; root, `/catalog`, deduplicated multi-host parsing, clamped page/pageSize, encoded product ID, invalid route, multi-host product return context, and reset URLs asserted |
+| API requests | Exact catalog/host/detail URLs; repeated host filters and existing `v1` envelope fields remain intact | Passed 2026-08-03: focused suite 10/10; exact catalog URL with two repeated `hostID` values, host/detail paths, and `apiVersion`, `items`, `page`, `pageSize`, `total` asserted |
 | Safe projection/rendering | Required public copy renders; artifact/package/signing/private/runtime/unsafe preview values never render or become URLs | Passed 2026-08-03: focused suite 10/10; view model/markup excludes artifact, object key, digest, signature, public key, package paths, review/private/runtime values; unsafe preview yields no image source; escaped text and URL scheme tests pass |
 | UI states | Loading, ready, empty/reset, no-hosts, not-found, API error/retry, offline preserve context | Passed 2026-08-03: focused suite 10/10; deterministic render states and Chrome aborted-request Retry flow preserve search/host/product context |
 | Incompatible host | Explicit incompatible/unavailable text; no component/install/deep-link CTA; alternative context only | Passed 2026-08-03: focused suite 10/10 and Chrome 150.0.0.0 at 1440x1000; Weather Window + NotchinTosh says unavailable, returns LaunchinTosh download context, and exposes no install/deep-link action |
 | Web handler | `/v1` delegates unchanged; shell serves catalog/detail refresh; known assets have correct content type; other paths are safe 404 | Passed 2026-08-03: focused suite 10/10; in-memory asset smoke and handler assertions preserve status/headers and cover `/`, `/catalog`, `/products/:id`, CSS, JS, `/v1`, and safe 404 |
-| Existing service regression | Focused web tests and full suite pass with the additive capability assertion | Passed 2026-08-03: `bun test src/web/catalog.test.ts` 10/10 with 0 failures; `bun test` 32/32 with 0 failures and 218 expectations; capability projection plus existing 22 service tests remain passing |
-| Host logo/card visual contract | Host dropdown is absent; logo buttons expose selected state; cards show product logo, Check out/Get actions, four preview tiles, and no component IDs | Passed 2026-08-03: Chrome 150.0.0.0 at 1440x1000 and 390x844; desktop screenshot `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-154971109ca363d6.webp`, narrow screenshot `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-15497144b2a363d7.webp`; focused suite 10/10 asserts picker/card markup and excludes component IDs |
+| Existing service regression | Focused web tests and full suite pass with the additive capability assertion | Passed 2026-08-03: `bun test src/web/catalog.test.ts` 10/10 with 0 failures and 109 expectations; `bun test` 32/32 with 0 failures and 223 expectations; capability projection plus existing 22 service tests remain passing |
+| Host logo/card visual contract | Host dropdown and visible host-name copy are absent; accessible logo buttons expose selected state; cards show product logo, Check out/Get actions, four preview tiles, and no component IDs | Passed 2026-08-03: Chrome 150.0.0.0 at 1440x1000 and 390x844; desktop screenshot `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-15498ae6117a4c60.webp`, narrow screenshot `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-15498b3359fa4c61.webp`; focused suite 10/10 asserts picker/card markup and excludes component IDs |
 | Browser desktop | Chromium reaches catalog anonymously, searches, filters, opens/refreshes detail, resets, retries, keyboard navigates, and shows safe states at 1440x1000 | Passed 2026-08-03: Chrome 150.0.0.0, 1440x1000; anonymous browse, `weather` search, LaunchinTosh filter, detail navigation/refresh, empty/reset, aborted catalog request + Retry, keyboard Search → Host → product Enter, no horizontal overflow; screenshots `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-1549619f4b096184.webp`, `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-1549633a51c96185.webp`, `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-154963709f896186.webp` |
 | Browser narrow/reduced motion | 390x844 has no horizontal overflow and readable stacked content; reduced motion removes nonessential motion without losing function | Passed 2026-08-03: Chrome 150.0.0.0 at 390x844 reported `scrollWidth === 390`, one-column card/detail layouts, preserved back URL; `prefers-reduced-motion: reduce` reported match, loading animation `1e-05s`, no stale product, and ready navigation remained usable |
 | Host filter interaction | Selecting a host logo updates `hostID`, preserves search text, filters results, and keeps the selected tile pressed | Passed 2026-08-03: Chrome 150.0.0.0 clicked LaunchinTosh, searched `weather`, observed `/catalog?q=weather&hostID=launchintosh`, one Weather Window card, and `aria-pressed=true` |
+| Multi-host filter interaction | Selecting two logo-only host tiles serializes repeated `hostID` values, preserves the query, returns the OR-filtered result set, and keeps both tiles pressed without visible host-name copy | Passed 2026-08-03: Chrome 150.0.0.0 at 1440x1000 searched `focus`, selected NotchinTosh then LaunchinTosh, observed `/catalog?q=focus&hostID=notchintosh&hostID=launchintosh`, picker button text `◎`, `NO`, `LA`, `visibleHostNames=false`, `scrollWidth=1440`, and one Focus Field Guide card |
 | External integrations | PostgreSQL, S3/object storage, Tosh account, CDN, signed handoff, host installation, and deployment | Explicitly unverified in F04-C; fake MemoryMarketplaceStore/MemoryArtifactStore fixture only |
