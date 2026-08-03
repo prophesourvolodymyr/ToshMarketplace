@@ -261,6 +261,7 @@ export interface CatalogProductSummary {
 export interface CatalogComponent {
   component: Pick<HostComponent, "id" | "hostID" | "packageFormat" | "bridgeID" | "releaseChannel">;
   release: Pick<Release, "id" | "version" | "releaseNotes" | "artifact" | "compatibility">;
+  capabilities: readonly CapabilityDeclaration[];
   widgets: readonly Pick<Widget, "id" | "name" | "icon" | "description" | "previewImages" | "supportedSizes" | "states">[];
   installable: boolean;
   unavailableReason?: string;

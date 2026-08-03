@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit",
+    "web": "bun run src/web/dev-server.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

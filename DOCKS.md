@@ -13,22 +13,25 @@ ToshMarketplace is the shared public web and service platform for Tosh products.
 - Immutable content-addressed artifact distribution.
 - Quarantine, revocation, takedown, appeals, rollback, and audit records.
 - Versioned API and SDK client contracts for host apps.
+- Additive public component capability declarations for the browser permission explanation boundary.
 - Privacy boundary between public metadata, publisher data, and runtime data.
 
 ## Repository Migration Boundary
 
-`ToshMarketplace/` now owns the verified F04-A/F04-B Bun and TypeScript marketplace service. The service, tests, package boundary, lockfile, configuration, and migration were copied from `../NotchinTosh/marketplace/` and verified independently on 2026-08-01. New marketplace service work belongs here; `NotchinTosh/marketplace/` remains intact as a preserved historical/reference copy.
+`ToshMarketplace/` owns the verified F04-A/F04-B Bun and TypeScript marketplace service and the F04-C framework-free public web catalog slice. The service, tests, package boundary, lockfile, configuration, and migration were copied from `../NotchinTosh/marketplace/` and verified independently on 2026-08-01. The new web implementation belongs here; `../NotchinTosh/marketplace/` remains intact as preserved historical/reference code.
 
-The migration is complete for the deterministic service slice. This repository does not yet own the public web catalog, publisher dashboard, production integrations, Swift clients, or host installation/runtime work.
+The deterministic service migration and anonymous web catalog/detail slice are now verified in this repository. Publisher dashboard, production integrations, Swift clients, signed host handoff, package installation, and host runtime work remain outside the completed scope.
 
-The first implementation slice in this repository is the reference-service migration. It is not the web catalog, Swift client, or host installation work.
+F04-C owns `src/web/catalog.ts`, the static shell/styles, the injectable serving seam, the fake browser fixture, and deterministic web tests. It delegates unchanged `/v1` service routes and never executes package code.
 
 ## Architecture
 
 ```text
 ToshMarketplace
-├── web catalog
-├── publisher portal
+├── `src/web` anonymous catalog/detail shell
+│   ├── typed routes, API client, safe view models
+│   ├── escaped semantic rendering and responsive styles
+│   └── injectable Bun asset/handler seam
 ├── API
 │   ├── public catalog routes
 │   ├── authenticated publisher routes
@@ -51,7 +54,7 @@ The marketplace web service never executes package code. A marketplace approval 
 
 | Area | Required states and behavior |
 |---|---|
-| Catalog | Loading, populated, empty, offline, incompatible, unavailable, quarantined |
+| Catalog | Loading, populated, empty, no-hosts, offline, API error/retry, incompatible, unavailable, quarantined |
 | Publisher | Signed out, ineligible, Developer Mode enabled, terms missing, active, restricted, suspended, removed |
 | Submission | Draft, validating, rejected, under review, needs human review, approved, published, quarantined |
 | Release | Draft, published, superseded, revoked, archived |
@@ -68,6 +71,7 @@ The marketplace web service never executes package code. A marketplace approval 
 - Quarantine disables installation while preserving auditable history.
 - Host compatibility is checked before enabling installation.
 - Public pages must not expose private drafts, package filesystem paths, or review secrets.
+- Browser public projection: Capabilities are additive public declarations; browser discards artifacts/signatures/package paths/private publisher fields, uses escaped text and allowlisted external links, and never renders preview paths or deep-link schemes.
 
 ## Open Extension Policy
 
@@ -75,10 +79,11 @@ The marketplace is intentionally open to product-specific additions. A host may 
 
 ## Files
 
-- `package.json`, `bun.lock`, `tsconfig.json`, `.gitignore` — private Bun/TypeScript service package, locked dependencies, strict compiler settings, and generated-file boundary.
-- `src/` — migrated domain, catalog, storage, validation, publishing, HTTP, PostgreSQL, object-storage, and Tosh account-authorization service modules.
-- `src/marketplace.test.ts` — 14 deterministic marketplace catalog, validation, publishing, review, quarantine, privacy, signing, and rate-limit tests.
-- `src/service-boundaries.test.ts` — 8 deterministic PostgreSQL, object-storage, account-authorization, actor, and HTTP boundary tests.
+- `package.json`, `bun.lock`, `tsconfig.json`, `.gitignore` — private Bun/TypeScript service package, locked dependencies, strict compiler settings, generated-file boundary, and dependency-free `web` script.
+- `src/` — migrated domain, catalog, storage, validation, publishing, HTTP, PostgreSQL, object-storage, account-authorization, and `src/web` browser/serving modules.
+- `src/web/index.html`, `src/web/catalog.css` — accessible browser shell and editorial responsive visual surface.
+- `src/web/catalog.test.ts` — 10 deterministic route, API, view-model, rendering, state, handler, and capability-boundary tests.
+- `src/marketplace.test.ts` and `src/service-boundaries.test.ts` — original 14 marketplace and 8 service-boundary regression tests.
 - `migrations/001_marketplace_entities.sql` — unchanged JSONB marketplace metadata schema and indexes.
 
 ## Dependencies
@@ -94,16 +99,17 @@ The evidence below covers the independent deterministic package and preserved re
 
 | Scenario | Expected result | Evidence |
 |---|---|---|
-| Public discovery | Only public, valid products appear | Pending implementation |
-| Host filtering | Incompatible components cannot be installed | Pending implementation |
+| Public discovery | Only public, valid products appear | Passed 2026-08-03: fake-backed browser catalog shows two published products anonymously; focused web contracts 10/10 and full suite 32/32 |
+| Host filtering | Incompatible components cannot be installed | Passed 2026-08-03 for the public slice: host selection preserves query state, filters results, and incompatible Weather Window + NotchinTosh has no component/install/deep-link CTA; host installation/handoff remains pending |
 | Submission | Invalid package, source, digest, or signature is rejected | Pending implementation |
 | Review disagreement | Release enters human escalation without mutating prior releases | Pending implementation |
 | Quarantine | Installation is disabled and history remains auditable | Pending implementation |
-| Privacy | Runtime data and credentials never enter public metadata | Pending implementation |
+| Privacy | Runtime data and credentials never enter public metadata | Passed 2026-08-03 for browser projection: artifact/object-key/digest/signature/public-key/package-path/contact/private/review/runtime values are absent; unsafe preview paths produce no image source; live external services remain unverified |
 | Host failure | Marketplace remains available when a host component crashes | Pending host integration |
 | Product-specific contribution | A host can add a marketplace capability with compatibility and security evidence | Pending implementation |
 | Target migration | The service package and unchanged JSONB migration are independent in `ToshMarketplace/`; no runtime path imports the sibling source repository | Passed 2026-08-01: copied package/config/migration and 12 service source/test files; portable signed-directory validation passed |
-| Target package verification | Frozen install, strict typecheck, focused boundary suite, and full deterministic suite pass | Passed 2026-08-01: `bun install --frozen-lockfile`; `bun run typecheck`; `bun test src/service-boundaries.test.ts` 8/8 with 0 failures; `bun test` 22/22 with 0 failures (14 marketplace + 8 boundary) |
+| Target package verification | Frozen install, strict typecheck, focused web suite, and full deterministic suite pass | Passed 2026-08-03: `bun install --frozen-lockfile`; `bun run typecheck`; `bun test src/web/catalog.test.ts` 10/10 with 0 failures; `bun test` 32/32 with 0 failures (209 expectations, including original 22 service tests) |
+| Public web browser verification | Anonymous desktop/mobile/reduced-motion catalog and product flows remain usable and safe | Passed 2026-08-03: Chrome 150.0.0.0 at 1440x1000 and 390x844; search, host filter, detail refresh, empty/reset, aborted-request Retry, keyboard traversal, no-host, incompatible-host, no horizontal overflow, reduced motion, and DOM safety checks passed; screenshots recorded in F04-C DOCKS |
 | Preserved source regression | The NotchinTosh service remains present and behaviorally unchanged | Passed 2026-08-01: `NotchinTosh/marketplace/` `bun run typecheck && bun test` 22/22 with 0 failures; `git diff --exit-code -- marketplace` clean |
 | Swift host regression | Host runtime remains compatible after migration | Passed 2026-08-01: `NotchinTosh/NotchinTosh/` `swift test` 43/43 with 0 failures |
 | Security and file boundary | No source-repository imports, credentials, signing material, runtime data, or generated artifacts enter the target migration | Passed 2026-08-01: target source/config/migration scan found no `../NotchinTosh` or `NotchinTosh/marketplace` path; untracked migration list contains only declared files; `node_modules/`, `.env*`, `dist/`, `build/`, `coverage/`, `*.tgz`, and `*.notchbridge` are ignored |

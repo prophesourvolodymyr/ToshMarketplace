@@ -70,6 +70,7 @@ function publicComponent(context: PublicComponentContext, installable: boolean, 
       artifact: release.artifact,
       compatibility: release.compatibility,
     },
+    capabilities: component.capabilities,
     widgets: widgets.map((widget) => ({
       id: widget.id,
       name: widget.name,

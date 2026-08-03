@@ -30,7 +30,7 @@ This project owns the marketplace service and future web/API platform. The F04-A
 
 ## Cycle 3 — Public Web Marketplace
 
-- [ ] Build anonymous public catalog and static product/widget pages
+- [x] Build anonymous public catalog and static product/widget pages
 - [ ] Add host compatibility filtering and deep-link installation handoff
 - [ ] Add authenticated publisher dashboard
 - [ ] Verify public/private metadata and privacy boundaries

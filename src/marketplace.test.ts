@@ -290,6 +290,8 @@ describe("F04-A catalog and storage contracts", () => {
     const catalogResponse = await handler(new Request("https://marketplace.test/v1/catalog/products?q=focus"));
     expect(catalogResponse.status).toBe(200);
     expect((await catalogResponse.json()).apiVersion).toBe("v1");
+    const product = await catalog.getProduct("product.example");
+    expect(product?.components[0]?.capabilities).toEqual([capability]);
     const privateResponse = await handler(new Request("https://marketplace.test/v1/publishers/pub.example/submissions", { method: "POST", body: "{}" }));
     expect(privateResponse.status).toBe(401);
   });
