@@ -516,12 +516,18 @@ function hostLabel(hosts: readonly HostViewModel[], hostID: string): string {
   return hosts.find((host) => host.id === hostID)?.displayName ?? hostID;
 }
 
-function renderHostOptions(hosts: readonly HostViewModel[], selectedHostID: string | undefined, disabled: boolean): string {
-  const options = [`<option value="">All hosts</option>`];
-  for (const host of hosts) {
-    options.push(`<option value="${escapeHTML(host.id)}"${selectedHostID === host.id ? " selected" : ""}>${escapeHTML(host.displayName)}</option>`);
-  }
-  return `<select id="catalog-host" name="hostID"${disabled ? " disabled" : ""} aria-describedby="host-filter-help">${options.join("")}</select>`;
+function renderAppLogo(value: string, size: "small" | "large" = "large"): string {
+  const glyph = value.trim().slice(0, 2).toUpperCase() || "•";
+  return `<span class="app-logo app-logo--${size}" aria-hidden="true">${escapeHTML(glyph)}</span>`;
+}
+
+function renderHostPicker(hosts: readonly HostViewModel[], selectedHostID: string | undefined, disabled: boolean): string {
+  const options = [{ id: "", displayName: "All apps", icon: "all" }, ...hosts];
+  return `<div class="host-picker" role="group" aria-label="Choose a host app">${options.map((host) => {
+    const selected = host.id ? selectedHostID === host.id : !selectedHostID;
+    const filter = host.id || "all";
+    return `<button class="host-picker__option${selected ? " host-picker__option--selected" : ""}" type="button" data-host-filter="${escapeHTML(filter)}" aria-pressed="${selected}"${disabled ? " disabled" : ""}><span class="host-picker__logo">${renderAppLogo(host.icon, "small")}</span><span class="host-picker__copy"><strong>${escapeHTML(host.displayName)}</strong><span>${selected ? "Selected" : "View products"}</span></span></button>`;
+  }).join("")}</div>`;
 }
 
 function renderHeader(): string {
@@ -529,26 +535,35 @@ function renderHeader(): string {
 }
 
 function renderCatalogControls(route: CatalogURLState, model: CatalogViewModel): string {
-  const hostHelp = model.hostDataAvailable ? "Filter products by a compatible Tosh host." : "Host compatibility is temporarily unavailable.";
-  return `<section class="catalog-controls" aria-labelledby="catalog-controls-title"><div class="section-kicker">Discovery</div><h2 id="catalog-controls-title">Find a product for your setup</h2><form id="catalog-search" class="search-form"><div class="search-form__field search-form__field--query"><label for="catalog-query">Search products, widgets, or publishers</label><input id="catalog-query" name="q" type="search" value="${escapeHTML(route.text)}" autocomplete="off" placeholder="Try focus, weather, or a publisher" /></div><div class="search-form__field"><label for="catalog-host">Host</label>${renderHostOptions(model.hosts, route.hostID, !model.hostDataAvailable || model.hosts.length === 0)}<p id="host-filter-help" class="field-help">${escapeHTML(hostHelp)}</p></div><div class="search-form__actions"><button class="button button--primary" type="submit">Search</button><button class="button button--quiet" type="button" data-action="reset">Reset</button></div></form></section>`;
+  const hostHelp = model.hostDataAvailable ? "Choose a host app to filter its products." : "Host app choices are temporarily unavailable.";
+  return `<section class="catalog-controls" aria-labelledby="catalog-controls-title"><div class="section-kicker">Discovery</div><h2 id="catalog-controls-title">Find a product for your setup</h2><form id="catalog-search" class="search-form"><div class="search-form__field search-form__field--query"><label for="catalog-query">Search products, widgets, or publishers</label><input id="catalog-query" name="q" type="search" value="${escapeHTML(route.text)}" autocomplete="off" placeholder="Try focus, weather, or a publisher" /></div><div class="search-form__field search-form__field--hosts"><span class="field-label" id="host-filter-label">Hosts</span>${renderHostPicker(model.hosts, route.hostID, !model.hostDataAvailable || model.hosts.length === 0)}<p id="host-filter-help" class="field-help">${escapeHTML(hostHelp)}</p></div><div class="search-form__actions"><button class="button button--primary" type="submit">Search</button><button class="button button--quiet" type="button" data-action="reset">Reset</button></div></form></section>`;
 }
 
-function renderVersionList(item: CatalogCardViewModel, hosts: readonly HostViewModel[]): string {
-  const versions = Object.entries(item.currentVersions);
-  if (versions.length === 0) return "";
-  return `<ul class="version-list" aria-label="Current versions">${versions.map(([hostID, version]) => `<li><span>${escapeHTML(hostLabel(hosts, hostID))}</span><code>${escapeHTML(version)}</code></li>`).join("")}</ul>`;
+function renderCardPreviewGrid(item: CatalogCardViewModel): string {
+  const previewMarks = ["✦", "◌", "⌁", "＋"];
+  return `<div class="card-preview-grid" role="group" aria-label="${escapeHTML(item.name)} preview thumbnails">${previewMarks.map((mark, index) => `<div class="card-preview-tile" role="img" aria-label="${escapeHTML(`${item.name} preview ${index + 1}`)}"><span aria-hidden="true">${mark}</span><small>${escapeHTML(item.icon)}</small></div>`).join("")}</div>`;
 }
 
-function renderPreviewFallback(label: string, detail = "Preview unavailable in browser"): string {
-  return `<div class="preview-fallback" role="img" aria-label="${escapeHTML(label)}"><span class="preview-fallback__glyph" aria-hidden="true">✦</span><span>${escapeHTML(detail)}</span></div>`;
+function renderCardVersion(item: CatalogCardViewModel): string {
+  const versions = [...new Set(Object.values(item.currentVersions).filter((version) => version.trim() !== ""))];
+  const label = versions.length === 0 ? "Version pending" : versions.length === 1 ? `v${versions[0]}` : `${versions.length} current versions`;
+  return `<span class="card-meta__version">${escapeHTML(label)}</span>`;
+}
+
+function renderCardCompatibility(item: CatalogCardViewModel, route: CatalogURLState, hosts: readonly HostViewModel[], hostDataAvailable: boolean): string {
+  if (!hostDataAvailable) return `<span class="card-meta card-meta--warning"><span class="status-dot status-dot--warning" aria-hidden="true"></span>Compatibility pending</span>`;
+  if (route.hostID) {
+    const selectedHost = hostLabel(hosts, route.hostID);
+    const compatible = item.compatibleHostIDs.includes(route.hostID);
+    return `<span class="card-meta card-meta--${compatible ? "success" : "warning"}"><span class="status-dot status-dot--${compatible ? "success" : "warning"}" aria-hidden="true"></span>${escapeHTML(compatible ? `For ${selectedHost}` : `Not available for ${selectedHost}`)}</span>`;
+  }
+  const hostCount = item.compatibleHostIDs.length;
+  return `<span class="card-meta card-meta--${hostCount > 0 ? "success" : "warning"}"><span class="status-dot status-dot--${hostCount > 0 ? "success" : "warning"}" aria-hidden="true"></span>${escapeHTML(hostCount > 0 ? `${hostCount} compatible host${hostCount === 1 ? "" : "s"}` : "Compatibility pending")}</span>`;
 }
 
 function renderProductCard(item: CatalogCardViewModel, route: CatalogURLState, hosts: readonly HostViewModel[], index: number, hostDataAvailable: boolean): string {
-  const tags = item.tags.length > 0 ? `<ul class="tag-list" aria-label="Tags">${item.tags.map((tag) => `<li>${escapeHTML(tag)}</li>`).join("")}</ul>` : "";
-  const hostText = hostDataAvailable && item.compatibleHostIDs.length > 0 ? item.compatibleHostIDs.map((hostID) => hostLabel(hosts, hostID)).join(", ") : "Host compatibility unavailable";
-  const compatibilityPrefix = hostDataAvailable && item.compatibleHostIDs.length > 0 ? "Compatible with " : "";
-  const compatibilityStatus = hostDataAvailable && item.compatibleHostIDs.length > 0 ? "success" : "warning";
-  return `<article class="product-card${index === 0 ? " product-card--featured" : ""}"><div class="product-card__preview">${renderPreviewFallback(`${item.name} preview`)}</div><div class="product-card__body"><div class="product-card__eyebrow"><span>${escapeHTML(item.publisherName)}</span><span aria-hidden="true">·</span><span>${escapeHTML(String(item.widgetCount))} widget${item.widgetCount === 1 ? "" : "s"}</span></div><h3>${escapeHTML(item.name)}</h3><p class="product-card__description">${escapeHTML(item.shortDescription)}</p>${tags}<p class="compatibility-line"><span class="status-dot status-dot--${compatibilityStatus}" aria-hidden="true"></span><span>${compatibilityPrefix}${escapeHTML(hostText)}</span></p>${renderVersionList(item, hosts)}<a class="discover-link" href="${escapeHTML(productURL(item.productID, route.hostID, route.text))}" data-app-route>Discover product <span aria-hidden="true">↗</span></a></div></article>`;
+  const handoffID = `get-note-${item.productID.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  return `<article class="product-card${index === 0 ? " product-card--featured" : ""}"><div class="product-card__body"><div class="product-card__top">${renderAppLogo(item.icon)}<div class="product-card__identity"><div class="product-card__eyebrow">${escapeHTML(item.publisherName)}</div><h3>${escapeHTML(item.name)}</h3><p class="product-card__description">${escapeHTML(item.shortDescription)}</p><div class="product-card__actions"><a class="card-action card-action--primary" href="${escapeHTML(productURL(item.productID, route.hostID, route.text))}" data-app-route>Check out</a><button class="card-action card-action--secondary" type="button" disabled aria-describedby="${escapeHTML(handoffID)}">Get</button></div><p class="card-handoff-note" id="${escapeHTML(handoffID)}">Host-app handoff is not available yet.</p></div></div>${renderCardPreviewGrid(item)}<footer class="product-card__footer"><span class="card-meta">${escapeHTML(String(item.widgetCount))} widget${item.widgetCount === 1 ? "" : "s"}</span>${renderCardCompatibility(item, route, hosts, hostDataAvailable)}${renderCardVersion(item)}</footer></div></article>`;
 }
 
 function renderCatalogResults(route: CatalogURLState, model: CatalogViewModel): string {
@@ -574,6 +589,11 @@ export function renderCatalogState(state: CatalogViewState): string {
   const hostNotice = state.kind === "no-hosts" ? `<aside class="notice notice--warning" role="status"><strong>Host compatibility needs attention.</strong><span>No active host metadata is available, so products are shown without a universal compatibility claim.</span></aside>` : "";
   return `${renderHeader()}<main class="catalog-page" data-state="${state.kind}"><div class="page-width">${renderCatalogControls(state.route, model)}${hostNotice}${content}</div></main>`;
 }
+
+function renderPreviewFallback(label: string, detail = "Preview unavailable in browser"): string {
+  return `<div class="preview-fallback" role="img" aria-label="${escapeHTML(label)}"><span class="preview-fallback__glyph" aria-hidden="true">✦</span><span>${escapeHTML(detail)}</span></div>`;
+}
+
 
 function renderSafeLink(link: SafeLinkViewModel): string {
   return `<a class="metadata-link" href="${escapeHTML(link.href)}" target="_blank" rel="noreferrer">${escapeHTML(link.label)} <span aria-hidden="true">↗</span></a>`;
@@ -745,6 +765,14 @@ export function mountMarketplaceApp(root: HTMLElement, options: MarketplaceAppOp
   const onClick = (event: MouseEvent): void => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+    const hostFilter = target.closest<HTMLButtonElement>("[data-host-filter]")?.dataset.hostFilter;
+    if (hostFilter !== undefined) {
+      event.preventDefault();
+      const route = parseRoute(new URL(browserWindow.location.href));
+      if (route.kind !== "catalog") return;
+      navigate(catalogURL({ text: route.state.text, hostID: hostFilter === "all" ? undefined : hostFilter, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
+      return;
+    }
     const action = target.closest<HTMLElement>("[data-action]")?.dataset.action;
     if (action === "retry") {
       event.preventDefault();
@@ -769,24 +797,17 @@ export function mountMarketplaceApp(root: HTMLElement, options: MarketplaceAppOp
     if (!(form instanceof HTMLFormElement) || form.id !== "catalog-search") return;
     event.preventDefault();
     const query = form.querySelector<HTMLInputElement>("#catalog-query")?.value ?? "";
-    const hostID = form.querySelector<HTMLSelectElement>("#catalog-host")?.value || undefined;
+    const route = parseRoute(new URL(browserWindow.location.href));
+    const hostID = route.kind === "catalog" ? route.state.hostID : undefined;
     navigate(catalogURL({ text: query, hostID, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
   };
 
-  const onChange = (event: Event): void => {
-    const target = event.target;
-    if (!(target instanceof HTMLSelectElement) || target.id !== "catalog-host") return;
-    const route = parseRoute(new URL(browserWindow.location.href));
-    if (route.kind !== "catalog") return;
-    navigate(catalogURL({ text: route.state.text, hostID: target.value || undefined, page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE }));
-  };
   const onPopState = (): void => {
     void load();
   };
 
   root.addEventListener("click", onClick);
   root.addEventListener("submit", onSubmit);
-  root.addEventListener("change", onChange);
   browserWindow.addEventListener("popstate", onPopState);
   void load();
 
@@ -797,11 +818,11 @@ export function mountMarketplaceApp(root: HTMLElement, options: MarketplaceAppOp
       requestID += 1;
       root.removeEventListener("click", onClick);
       root.removeEventListener("submit", onSubmit);
-      root.removeEventListener("change", onChange);
       browserWindow.removeEventListener("popstate", onPopState);
     },
   };
 }
+
 
 function bootstrap(): void {
   const root = document.querySelector<HTMLElement>("#app");

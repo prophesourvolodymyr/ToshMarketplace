@@ -51,9 +51,9 @@ The independent Bun/TypeScript service owns domain models, public catalog filter
 
 F04-C adds the framework-free browser module, typed route/API/view-model boundary, accessible editorial catalog/detail surface, same-origin shell handler, deterministic fake fixture, and browser/contract evidence described in the child document.
 
-### Remaining F04 Areas
+## Remaining F04 Areas
 
-Publisher dashboard, account flows, production PostgreSQL/S3/Tosh-account deployment, signed host installation handoff, package download/verification UX, Swift marketplace clients, host runtime integration, and operational evidence remain pending and must not be marked complete by F04-C.
+Publisher dashboard, account flows, production PostgreSQL/S3/Tosh-account deployment, signed host installation handoff, package download/verification UX, Swift marketplace clients, host runtime integration, and operational evidence remain pending and must not be marked complete by F04-C. The pending Swift client must reuse the approved marketplace direction: black-and-white surfaces with a warm accent, selectable host-app logo tiles, and concise product cards with the logo leading the identity.
 
 ## States
 

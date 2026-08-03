@@ -12,7 +12,8 @@ F04-C is the anonymous, same-origin Tosh Marketplace catalog and public product/
   - `GET /v1/hosts`
   - `GET /v1/products/:id` or `GET /v1/products/:id?hostID=`
 - Safe public catalog cards and product detail view models that discard private and artifact metadata.
-- Public host names, icons, compatibility context, and allowlisted host download links as context only.
+- Host app logo picker using public host icon placeholders instead of a host dropdown; one selected host app is reflected in the URL and results.
+- App Store-like product cards with a product logo at the left, concise identity and actions at the right, four safe preview placeholders, and a compact footer.
 - Explicit loading, ready, empty, no-hosts, unavailable/not-found, API-error, and offline states with retry/reset actions.
 - Accessible semantic markup, visible focus, keyboard navigation, stable loading skeletons, reduced-motion support, and responsive desktop/narrow layouts.
 - An injectable same-origin web handler, fake-backed `bun run web` fixture, and deterministic browser contract tests.
@@ -72,23 +73,25 @@ External links are allowed only for source, license, support, privacy, and host 
 
 ## UI Structure and Visual Direction
 
-The visual direction is a quiet editorial “field guide” catalog, not a dashboard or generic card wall.
+The visual direction is a black-and-white App Store-like catalog with one warm accent for action and selection. It is calm and editorial without presenting internal marketplace implementation details.
 
-- A dark graphite masthead rail contains the Tosh Marketplace wordmark and a compact search/host context line.
-- The catalog begins with an asymmetric featured-result band, then an intrinsic responsive product grid.
-- Each product card represents one product. A large safe fallback preview leads; publisher, compatibility, trust, tags, and release metadata remain subordinate; one discover action is clear.
-- Product detail uses a two-column preview/identity layout on wide windows and stacks into readable disclosure sections on narrow windows.
-- Compatibility appears as labeled text chips and explanatory copy, never color alone.
+- A black masthead rail contains the Tosh Marketplace wordmark and a compact public-metadata context line.
+- The discovery controls use a text search plus a horizontal host-app logo rail. Every active host is a selectable logo tile with a placeholder mark, display name, selected state, and keyboard-operable button behavior. `All apps` is the default tile. There is no host dropdown.
+- The catalog keeps an asymmetric featured-result band, then an intrinsic responsive product grid.
+- Each product card is a consistent vertical composition. The product placeholder logo sits on the left of the identity row; the publisher and title sit on the right; `Check out` and a truthful disabled `Get` button sit directly below the title; four equal safe preview tiles sit below the actions; the footer contains only widget count, compatibility summary, and a single latest-version summary.
+- Cards never show component IDs, bridge IDs, package formats, per-host version rows, signing data, artifact paths, or runtime details. The public card is a product discovery surface, not an implementation inspector.
+- Product detail keeps the preview/identity layout on wide windows and stacks into readable disclosure sections on narrow windows. Detail compatibility remains explicit and does not invent an installation handoff.
+- Compatibility appears as labeled text and status indicators, never color alone.
 - Semantic CSS variables are required for `canvas`, `surface`, `surfaceSecondary`, `textPrimary`, `textSecondary`, `textTertiary`, `separator`, `accent`, `success`, `warning`, `danger`, and `focusRing`.
-- The web font stack follows the shared design system: `-apple-system`, `BlinkMacSystemFont`, `sans-serif`; code-like IDs/versions use `ui-monospace`, `monospace`.
-- Spacing follows the four-point grid; cards use 12px radii, primary surfaces 16px, and low-depth broad shadows.
+- The web font stack follows the shared design system: `-apple-system`, `BlinkMacSystemFont`, `sans-serif`; code-like values use `ui-monospace`, `monospace`.
+- Spacing follows the four-point grid; product cards preserve a stable vertical ratio and keep the four preview tiles inside the card at desktop and 390px narrow widths.
 
 ## States and Behavior
 
 | State | Catalog behavior | Detail behavior |
 |---|---|---|
 | Loading | Replace results with stable skeleton cards; no stale result markup | Replace detail with stable skeleton sections; no stale detail markup |
-| Ready | Search form, host select, reset controls, result summary, cards, detail links | Product/publisher identity, safe preview, widgets, sizes/states, capabilities, versions, notes, compatibility, safe links |
+| Ready | Search form, host-app logo buttons, reset controls, result summary, concise product cards, and detail links | Product/publisher identity, safe preview, widgets, sizes/states, capabilities, versions, notes, compatibility, safe links |
 | Empty | Explain no matching products; expose text and host reset controls | Not applicable |
 | No hosts | Keep catalog/detail public metadata readable, say host compatibility is unavailable, never claim universal compatibility | Same; no install/handoff action |
 | Not found/unavailable | N/A | Readable unavailable page with catalog link and preserved route/search context |
@@ -100,13 +103,13 @@ Every status/error announcement uses an `aria-live` region. Error details are sa
 
 ## Accessibility and Motion
 
-- Use `header`, `nav`, `main`, `form`, visible `label`, `select`, `section`, `article`, `a`, `button`, headings, and lists.
+- Use `header`, `nav` where navigation is present, `main`, `form`, visible `label`/field label, host-picker `button` group, `section`, `article`, `a`, headings, and lists.
 - Text and attributes are built with `textContent`/DOM APIs or escaped by a proven `escapeHTML()` invariant. Static class/id names are the only unescaped markup.
 - Controls are keyboard operable with logical tab order, Enter/Space activation, visible high-contrast focus, and Escape dismissal for transient filter UI if introduced.
-- Search → host filter → product link traversal must be usable without a pointer.
+- Search → host logo filter → product link traversal must be usable without a pointer.
 - CSS transitions are limited to selection/focus and short surface fades. Loading motion is calm and nonessential.
 - `prefers-reduced-motion: reduce` disables transforms, staggered reveals, and continuous loading motion while preserving direct state replacement, content, focus, and navigation.
-- Narrow layouts stack cards/details, avoid horizontal overflow, and keep controls usable at 390x844.
+- Narrow layouts stack cards/details, keep four preview tiles inside the card, avoid horizontal overflow, and keep controls usable at 390x844.
 
 ## Serving Seam
 
@@ -147,7 +150,9 @@ Every status/error announcement uses an `aria-live` region. Error details are sa
 | UI states | Loading, ready, empty/reset, no-hosts, not-found, API error/retry, offline preserve context | Passed 2026-08-03: focused suite 10/10; deterministic render states and Chrome aborted-request Retry flow preserve search/host/product context |
 | Incompatible host | Explicit incompatible/unavailable text; no component/install/deep-link CTA; alternative context only | Passed 2026-08-03: focused suite 10/10 and Chrome 150.0.0.0 at 1440x1000; Weather Window + NotchinTosh says unavailable, returns LaunchinTosh download context, and exposes no install/deep-link action |
 | Web handler | `/v1` delegates unchanged; shell serves catalog/detail refresh; known assets have correct content type; other paths are safe 404 | Passed 2026-08-03: focused suite 10/10; in-memory asset smoke and handler assertions preserve status/headers and cover `/`, `/catalog`, `/products/:id`, CSS, JS, `/v1`, and safe 404 |
-| Existing service regression | Focused web tests and full suite pass with the additive capability assertion | Passed 2026-08-03: `bun test src/web/catalog.test.ts` 10/10 with 0 failures; `bun test` 32/32 with 0 failures and 209 expectations; capability projection plus existing 22 service tests remain passing |
+| Existing service regression | Focused web tests and full suite pass with the additive capability assertion | Passed 2026-08-03: `bun test src/web/catalog.test.ts` 10/10 with 0 failures; `bun test` 32/32 with 0 failures and 218 expectations; capability projection plus existing 22 service tests remain passing |
+| Host logo/card visual contract | Host dropdown is absent; logo buttons expose selected state; cards show product logo, Check out/Get actions, four preview tiles, and no component IDs | Passed 2026-08-03: Chrome 150.0.0.0 at 1440x1000 and 390x844; desktop screenshot `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-154971109ca363d6.webp`, narrow screenshot `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-15497144b2a363d7.webp`; focused suite 10/10 asserts picker/card markup and excludes component IDs |
 | Browser desktop | Chromium reaches catalog anonymously, searches, filters, opens/refreshes detail, resets, retries, keyboard navigates, and shows safe states at 1440x1000 | Passed 2026-08-03: Chrome 150.0.0.0, 1440x1000; anonymous browse, `weather` search, LaunchinTosh filter, detail navigation/refresh, empty/reset, aborted catalog request + Retry, keyboard Search → Host → product Enter, no horizontal overflow; screenshots `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-1549619f4b096184.webp`, `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-1549633a51c96185.webp`, `/var/folders/f2/k3zmhjfx5yd6x965gw58m3m00000gn/T/omp-sshots-154963709f896186.webp` |
 | Browser narrow/reduced motion | 390x844 has no horizontal overflow and readable stacked content; reduced motion removes nonessential motion without losing function | Passed 2026-08-03: Chrome 150.0.0.0 at 390x844 reported `scrollWidth === 390`, one-column card/detail layouts, preserved back URL; `prefers-reduced-motion: reduce` reported match, loading animation `1e-05s`, no stale product, and ready navigation remained usable |
+| Host filter interaction | Selecting a host logo updates `hostID`, preserves search text, filters results, and keeps the selected tile pressed | Passed 2026-08-03: Chrome 150.0.0.0 clicked LaunchinTosh, searched `weather`, observed `/catalog?q=weather&hostID=launchintosh`, one Weather Window card, and `aria-pressed=true` |
 | External integrations | PostgreSQL, S3/object storage, Tosh account, CDN, signed handoff, host installation, and deployment | Explicitly unverified in F04-C; fake MemoryMarketplaceStore/MemoryArtifactStore fixture only |

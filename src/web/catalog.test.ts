@@ -109,6 +109,15 @@ describe("F04-C public view model and safe rendering boundary", () => {
     expect(serialized).toContain("Next up");
     expect(serialized).toContain("NotchinTosh");
     expect(serialized).toContain("1.2.0");
+    expect(catalogMarkup).toContain("host-picker");
+    expect(catalogMarkup).toContain('data-host-filter="notchintosh"');
+    expect(catalogMarkup).not.toContain("<select");
+    expect(catalogMarkup).toContain("Check out");
+    expect(catalogMarkup).toContain(">Get</button>");
+    expect(catalogMarkup).toContain("card-preview-grid");
+    expect(catalogMarkup).not.toContain("component.focus.notch");
+    expect(catalogMarkup).not.toContain("component.focus.launch");
+    expect(catalogMarkup).not.toContain("Current versions");
     expect(serialized).toContain("Adds a clearer empty state");
     expect(serialized).toContain("Calendar events");
     expect(serialized).toContain("calendar metadata");
