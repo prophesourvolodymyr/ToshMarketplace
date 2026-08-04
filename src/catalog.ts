@@ -206,6 +206,30 @@ export class CatalogService {
     return detail;
   }
 
+  public async getPublicWidget(widgetID: ID): Promise<Pick<Widget, "id" | "name" | "icon" | "description" | "supportedSizes" | "states"> | undefined> {
+    const widget = await this.store.getWidget(widgetID);
+    if (!widget) return undefined;
+    const component = await this.store.getComponent(widget.componentID);
+    if (!component || !component.widgetIDs.includes(widget.id)) return undefined;
+    const product = await this.store.getProduct(component.productID);
+    if (!product || product.publicationStatus !== "published") return undefined;
+    const publisher = await this.store.getPublisher(product.publisherID);
+    if (!publisher || publisher.status !== "active") return undefined;
+    const releases = await this.store.listReleases(component.id);
+    if (!currentPublicRelease(component, releases)) return undefined;
+    const publicWidget: Pick<Widget, "id" | "name" | "icon" | "description" | "supportedSizes" | "states"> = {
+      id: widget.id,
+      name: widget.name,
+      icon: widget.icon,
+      description: widget.description,
+      supportedSizes: widget.supportedSizes,
+      states: widget.states,
+    };
+    assertPublicMetadataSafe(publicWidget);
+    return publicWidget;
+  }
+
+
   public async listHosts() {
     const hosts = (await this.store.listHosts()).filter((host) => host.lifecycle !== "retired");
     hosts.forEach((host) => assertPublicMetadataSafe(host));

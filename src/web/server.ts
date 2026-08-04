@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { CatalogService } from "../catalog";
+import { renderWidgetPreviewSVG } from "./widget-preview";
 import { createMarketplaceHandler, type MarketplaceAuthorizer } from "../http";
 import type { PublishingService } from "../publishing";
 
@@ -63,12 +64,43 @@ function isShellPath(pathname: string): boolean {
   return normalized === "/" || normalized === "/catalog" || isProductShellPath(normalized);
 }
 
+export function createMarketplaceWidgetPreviewHandler(catalog: CatalogService): (request: Request) => Promise<Response> {
+  return async (request) => {
+    const prefix = "/assets/widget-previews/";
+    const pathname = new URL(request.url).pathname;
+    const encodedFilename = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : "";
+    const encodedID = encodedFilename.endsWith(".svg") ? encodedFilename.slice(0, -4) : "";
+    let widgetID: string | undefined;
+    if (encodedID && !encodedID.includes("/")) {
+      try {
+        const decoded = decodeURIComponent(encodedID);
+        if (decoded && !decoded.includes("/")) widgetID = decoded;
+      } catch {
+        widgetID = undefined;
+      }
+    }
+    if (!widgetID || (request.method !== "GET" && request.method !== "HEAD")) return textResponse("Not found.", "text/plain; charset=utf-8", 404);
+    const widget = await catalog.getPublicWidget(widgetID);
+    if (!widget) return textResponse("Not found.", "text/plain; charset=utf-8", 404);
+    const headers = {
+      "content-type": "image/svg+xml; charset=utf-8",
+      "cache-control": "public, max-age=3600",
+    };
+    return new Response(request.method === "HEAD" ? "" : renderWidgetPreviewSVG(widget), { status: 200, headers });
+  };
+}
+
 export function createMarketplaceWebHandler(
   apiHandler: (request: Request) => Promise<Response>,
   assets: MarketplaceWebAssets,
+  widgetPreviewHandler?: (request: Request) => Promise<Response>,
 ): (request: Request) => Promise<Response> {
   return async (request) => {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/assets/widget-previews/")) {
+      if (!widgetPreviewHandler) return textResponse("Not found.", "text/plain; charset=utf-8", 404);
+      return widgetPreviewHandler(request);
+    }
     if (url.pathname === "/assets/catalog.css" && (request.method === "GET" || request.method === "HEAD")) {
       return request.method === "HEAD" ? textResponse("", "text/css; charset=utf-8") : textResponse(assets.styles, "text/css; charset=utf-8");
     }
@@ -89,6 +121,6 @@ export async function createMarketplaceWebServer(
 ): Promise<MarketplaceWebServer> {
   const assets = await loadMarketplaceWebAssets();
   const apiHandler = createMarketplaceHandler(catalog, publishing, authorizer);
-  return Bun.serve({ port, fetch: createMarketplaceWebHandler(apiHandler, assets) });
+  return Bun.serve({ port, fetch: createMarketplaceWebHandler(apiHandler, assets, createMarketplaceWidgetPreviewHandler(catalog)) });
 }
 

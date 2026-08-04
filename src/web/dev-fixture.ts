@@ -215,17 +215,17 @@ export async function createMarketplaceWebFixture(): Promise<MarketplaceWebFixtu
   await store.savePublisher(fixturePublisher());
   await store.saveHost(fixtureHost(notchHostID, "NotchinTosh", "notch", "https://tosh.example/notchintosh"));
   await store.saveHost(fixtureHost(launchHostID, "LaunchinTosh", "launch", "https://tosh.example/launchintosh"));
-  await store.saveProduct(fixtureProduct(focusProductID, "Focus Field Guide", "focus", "A calm field note for the next thing that matters.", [notchHostID, launchHostID], ["component.focus.notch", "component.focus.launch"], ["focus", "productivity", "daily"]));
-  await store.saveProduct(fixtureProduct(weatherProductID, "Weather Window", "weather", "A compact forecast glance for the launch bar.", [launchHostID], ["component.weather.launch"], ["weather", "planning"]));
+  await store.saveProduct(fixtureProduct(focusProductID, "Focus Field Guide", "focus", "One calm note for what matters next.", [notchHostID, launchHostID], ["component.focus.notch", "component.focus.launch"], ["focus", "productivity", "daily"]));
+  await store.saveProduct(fixtureProduct(weatherProductID, "Weather Window", "weather", "A quick forecast for the launch bar.", [launchHostID], ["component.weather.launch"], ["weather", "planning"]));
   await store.saveComponent(fixtureComponent("component.focus.notch", focusProductID, notchHostID, "com.tosh.focus.notch", ["widget.focus.next"], [calendarCapability]));
   await store.saveComponent(fixtureComponent("component.focus.launch", focusProductID, launchHostID, "com.tosh.focus.launch", ["widget.focus.next", "widget.focus.note"], [calendarCapability]));
   await store.saveComponent(fixtureComponent("component.weather.launch", weatherProductID, launchHostID, "com.tosh.weather.launch", ["widget.weather.today"], [networkCapability]));
   await store.saveWidget(fixtureWidget("widget.focus.next", "component.focus.notch", "Next up", "next", "Shows the next calendar event without opening the host app.", ["compact", "wide"], ["loading", "ready", "empty", "offline"]));
   await store.saveWidget(fixtureWidget("widget.focus.note", "component.focus.launch", "Daily note", "note", "Keeps one short intention visible in the launch bar.", ["compact"], ["ready", "empty", "permissionDenied"]));
   await store.saveWidget(fixtureWidget("widget.weather.today", "component.weather.launch", "Today", "sun", "Shows a public forecast summary and temperature range.", ["compact", "wide"], ["loading", "ready", "error", "offline"]));
-  await store.saveRelease(fixtureRelease("release.focus.notch.1", "component.focus.notch", notchHostID, "1.2.0", "Adds a clearer empty state for days without events."));
-  await store.saveRelease(fixtureRelease("release.focus.launch.1", "component.focus.launch", launchHostID, "1.2.0", "Keeps the daily note visible while the host is compact."));
-  await store.saveRelease(fixtureRelease("release.weather.launch.1", "component.weather.launch", launchHostID, "2.0.1", "Improves the forecast fallback when the provider is offline."));
+  await store.saveRelease(fixtureRelease("release.focus.notch.1", "component.focus.notch", notchHostID, "1.2.0", "Clearer empty state."));
+  await store.saveRelease(fixtureRelease("release.focus.launch.1", "component.focus.launch", launchHostID, "1.2.0", "Keeps the daily note visible."));
+  await store.saveRelease(fixtureRelease("release.weather.launch.1", "component.weather.launch", launchHostID, "2.0.1", "Better offline fallback."));
   const publishing = new PublishingService(store, artifacts, [fixtureReviewer("fixture-reviewer-a"), fixtureReviewer("fixture-reviewer-b")]);
   const catalog = new CatalogService(store);
   const authorizer: MarketplaceAuthorizer = {
